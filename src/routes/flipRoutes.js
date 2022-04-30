@@ -16,7 +16,7 @@ debugRoutes.route('/app/log/access/').get(function (req, res, next) {
 });
 
 debugRoutes.route('/app/error/').get(function (req, res, next) {
-    throw new Error('Error test successful.') // Express will catch this on its own.
+    throw new Error('Error test successful.')
 })
 
 module.exports = debugRoutes;
