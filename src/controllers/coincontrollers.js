@@ -73,7 +73,6 @@ function countFlips(array) {
     heads: 0,
     tails: 0
   }
-  // TODO: account for undefined input?
   array.forEach(flip => {
     if (flip === HEADS) {
       summary.heads++
@@ -81,8 +80,6 @@ function countFlips(array) {
       summary.tails++
     }
   })
-
-  // Remove uneccessary properties.
   if (summary.heads == 0) {
     delete summary.heads
   } else if (summary.tails == 0) {
