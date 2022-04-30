@@ -45,13 +45,14 @@ app.use(require('./src/middleware/logging.js'))
 
 // Additional (combined format) logging middleware, if log is true
 if (allArguments['log'] == true) {
+
     // Require the fs and morgan modules
-    const fs = require('fs') // TODO: should I put this at the top?
+    const fs = require('fs')
     const morgan = require('morgan')
     // Use morgan for logging to files
     // Create a write stream to append (flags: 'a') to a file
     const loggingStream = fs.createWriteStream('./data/log/access.log', { flags: 'a' })
-    // Set up the access logging middleware
+    
     app.use(morgan('combined', { stream: loggingStream }))
 }
 
