@@ -1,19 +1,15 @@
 //Place your server entry point code here
 
-/***** Creating the server *****/
-// Define named constants
 const START_ARG_NUM = 2
 const EXIT_SUCCESS = 0
 const DEFAULT_PORT = 3000
 const HTTP_STATUS_OK = 200
 const HTTP_STATUS_NOT_FOUND = 404
 
-// Require minimist module to process arguments.
 const minimist = require('minimist')
 const { exit } = require('process')
 const allArguments = minimist(process.argv.slice(START_ARG_NUM))
 
-// Print help message if asked for.
 if (allArguments['help']) {
     console.log(`server.js [options]
     --port	Set the port number for the server to listen on. Must be an integer
