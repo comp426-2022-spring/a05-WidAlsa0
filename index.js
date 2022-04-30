@@ -27,11 +27,8 @@ if (allArguments['help']) {
     exit(EXIT_SUCCESS)
 }
 
-// Define a const `port` using the argument from the command line. 
-// Make this const default to port 3000 if there is no argument given for `--port`.
 const port = allArguments['port'] || process.env.PORT || DEFAULT_PORT
 
-// Require Express.js
 const express = require('express')
 const app = express()
 
