@@ -1,4 +1,4 @@
-/ Place your server entry point code here
+//Place your server entry point code here
 
 /***** Creating the server *****/
 // Define named constants
