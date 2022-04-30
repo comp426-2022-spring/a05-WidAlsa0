@@ -1,175 +1,98 @@
-// Place your server entry point code here
+/ Place your server entry point code here
+
+/***** Creating the server *****/
+// Define named constants
+const START_ARG_NUM = 2
+const EXIT_SUCCESS = 0
+const DEFAULT_PORT = 3000
+const HTTP_STATUS_OK = 200
+const HTTP_STATUS_NOT_FOUND = 404
+
+// Require minimist module to process arguments.
+const minimist = require('minimist')
+const { exit } = require('process')
+const allArguments = minimist(process.argv.slice(START_ARG_NUM))
+
+// Print help message if asked for.
+if (allArguments['help']) {
+    console.log(`server.js [options]
+    --port	Set the port number for the server to listen on. Must be an integer
+                between 1 and 65535.
+  
+    --debug	If set to \`true\`, creates endpoints /app/log/access/ which returns
+                a JSON access log from the database and /app/error which throws 
+                an error with the message "Error test successful." Defaults to 
+                \`false\`.
+  
+    --log	If set to false, no log files are written. Defaults to true.
+                Logs are always written to database.
+  
+    --help	Return this message and exit.`)
+    exit(EXIT_SUCCESS)
+}
+
+// Define a const `port` using the argument from the command line. 
+// Make this const default to port 3000 if there is no argument given for `--port`.
+const port = allArguments['port'] || process.env.PORT || DEFAULT_PORT
+
+// Require Express.js
 const express = require('express')
 const app = express()
-
-const arguments = require('minimist')(process.argv.slice(2))
-
-const db = require('./database.js')
-
-const morgan = require('morgan')
-
-const fs = require('fs')
-
-app.use(express.urlencoded({ extended: true}));
-app.use(express.json());
-
-
-const port = arguments.port || process.env.port || 5000
 
 // Start an app server
 const server = app.listen(port, () => {
     console.log('App listening on port %PORT%'.replace('%PORT%', port))
-});
+})
 
+// Serve static HTML files
+app.use(express.static('./public'));
+
+// Make Express use its own built-in body parser for both urlencoded and JSON body data.
+app.use(express.urlencoded({ extended: true }));
+app.use(express.json());
+
+// Logging middleware
+app.use(require('./src/middleware/logging.js'))
+
+// Additional (combined format) logging middleware, if log is true
+if (allArguments['log'] == true) {
+    // Require the fs and morgan modules
+    const fs = require('fs') // TODO: should I put this at the top?
+    const morgan = require('morgan')
+    // Use morgan for logging to files
+    // Create a write stream to append (flags: 'a') to a file
+    const loggingStream = fs.createWriteStream('./data/log/access.log', { flags: 'a' })
+    // Set up the access logging middleware
+    app.use(morgan('combined', { stream: loggingStream }))
+}
+
+
+/***** API endpoints *****/
+// Check endpoint
 app.get('/app/', (req, res, next) => {
-  // Respond with status 200
-      res.statusCode = 200;
-  // respond with status message "OK"
-      res.statusMessage = "Your API works!";
-      res.writeHead(res.statusCode, {'Content-Type' : 'text/plain'})
-      res.end(res.statusCode + ' ' + res.statusMessage);
-      
-  })
-  
-if (arguments.log == 'false'){
-  console.log("not creating access.log")
-} else{
-  const WRITESTREAM = fs.createWriteStream('access.log', { flags: 'a' })
-  // Set up the access logging middleware
-  app.use(morgan('combined', { stream: WRITESTREAM }))
-  
+    res.status(HTTP_STATUS_OK).json({
+        'message': "Your API works! (" + HTTP_STATUS_OK + ")"
+    })
+});
+
+//Coin-flipping
+app.use(require("./src/routes/flipRoutes"))
+
+// Logging and error testing, if debug is true
+if (allArguments['debug'] == true) {
+    app.use(require("./src/routes/debugRoutes"))
 }
 
-// Store help text 
-const help = (`
-server.js [options]
---port	Set the port number for the server to listen on. Must be an integer
-            between 1 and 65535.
---debug	If set to true, creates endlpoints /app/log/access/ which returns
-            a JSON access log from the database and /app/error which throws 
-            an error with the message "Error test successful." Defaults to 
-            false.
---log		If set to false, no log files are written. Defaults to true.
-            Logs are always written to database.
---help	Return this message and exit.
-`)
-
-if (arguments.help || arguments.h) {
-  console.log(help)
-  process.exit(0)
-}
-
-app.use( (req, res, next) => {
-  let logdata = {
-      remoteaddr: req.ip,
-      remoteuser: req.user,
-      time: Date.now(),
-      method: req.method,
-      url: req.url,
-      protocol: req.protocol,
-      httpversion: req.httpVersion,
-      status: res.statusCode,
-      referer: req.headers['referer'],
-      useragent: req.headers['user-agent']
-  }
-  console.log(logdata)
-  const stmt = db.prepare('INSERT INTO accesslog (remoteaddr, remoteuser, time, method, url, protocol, httpversion, status, referer, useragent) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
-  const info = stmt.run(logdata.remoteaddr, logdata.remoteuser, logdata.time, logdata.method, logdata.url, logdata.protocol, logdata.httpversion, logdata.status, logdata.referer, logdata.useragent)
-  next();
+// Default response for any request not addressed by the defined endpoints
+app.use(function (req, res, next) {
+    res.json({ "message": "Endpoint not found. (404)" });
+    res.status(HTTP_STATUS_NOT_FOUND);
 });
 
 
-
-
-if (arguments.debug || arguments.d){
-    app.get('/app/log/access/', (req, res, next) => {
-    const stmt = db.prepare('SELECT * FROM accesslog').all()
-    res.status(200).json(stmt)
-
+/***** Closing server *****/
+process.on('SIGTERM', () => {
+    server.close(() => {
+        console.log('Server stopped')
     })
-    app.get('/app/error/', (req, res, next) => {
-      throw new Error('Error')
-    })
-}
-
-
-
-
-app.get('/app/flip/', (req, res) => {
-   var flip = coinFlip()
-   res.status(200).json({ 'flip' : flip })
-})  
-
-
-app.get('/app/flips/:number', (req, res) => {
-    const finalFlips = coinFlips(req.params.number)
-    res.status(200).json({ 'raw': finalFlips, 'summary': countFlips(finalFlips) })
-
-}
-)
-
-app.get('/app/flip/call/heads', (req, res) => {
-    const flipRandomCoin = flipACoin("heads")
-    res.status(200).json( {"call": flipRandomCoin.call, "flip": flipRandomCoin.flip, "result": flipRandomCoin.result})
 })
-
-app.get('/app/flip/call/tails', (req, res) => {
-    const flipRandomCoin = flipACoin("tails")
-    res.status(200).json( {"call": flipRandomCoin.call, "flip": flipRandomCoin.flip, "result": flipRandomCoin.result})
-})
-
-
-
-// Default response for any other request
-app.use(function(req, res){
-    res.status(404).send('404 NOT FOUND')
-
-})
-
-
-
-// If --help or -h, echo help text to STDOUT and exit
-
-
-function coinFlip() {
-  return (Math.floor(Math.random() * 2) == 0) ? 'heads' : 'tails';
-}
-
-function coinFlips(flips) {
-    const array = [];
-    for (let i =0; i<flips; i++) {
-      array[i] = coinFlip();
-    }
-    return array
-  }
-
-function countFlips(array) {
- let heads = 0;
- let tails = 0;
- for (let i =0; i<array.length; i++) {
-   if (array[i].charAt[0] == 't') {
-        tails = tails + 1
-    } else {
-         heads = heads + 1
-   }
-}
-  
-    if (heads == 0) {
-      return { tails: tails}
-    } else if (tails == 0) {
-      return { heads: heads}
-    }
-  
-    return { 'heads': heads, 'tails': tails }
- }
-
-function flipACoin(call) {
-    let flip = coinFlip()
-    let outcome = ''
-    if (flip == call) {
-      outcome = 'win'
-    } else {
-      outcome = 'lose'
-    }
-    return { 'call': call, 'flip': flip, 'result': outcome }
-  }
