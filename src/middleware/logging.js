@@ -1,6 +1,5 @@
 // Middleware function definitions go here
 
-// Require database SCRIPT file
 const db = require('../services/database.js')
 
 function logging(req, res, next) {
